@@ -1,0 +1,39 @@
+# 生产环境 Dockerfile
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# 安装依赖
+COPY package*.json ./
+RUN npm ci --only=production
+
+# 复制源代码并构建
+COPY . .
+RUN npm run build
+
+# 生产镜像
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 创建非 root 用户
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# 从构建阶段复制文件
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
+
+# 切换到非 root 用户
+USER nodejs
+
+# 暴露端口
+EXPOSE 8000
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1
+
+# 启动命令
+CMD ["node", "dist/index.js"]

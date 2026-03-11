@@ -1,0 +1,38 @@
+import { Pool } from 'pg';
+import { config } from './index';
+
+export const pool = new Pool({
+  host: config.database.host,
+  port: config.database.port,
+  database: config.database.name,
+  user: config.database.user,
+  password: config.database.password,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+export const connectDatabase = async () => {
+  try {
+    const client = await pool.connect();
+    await client.query('SELECT NOW()');
+    client.release();
+    console.log('Database connected successfully');
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    throw error;
+  }
+};
+
+export const query = async (text: string, params?: any[]) => {
+  const start = Date.now();
+  try {
+    const result = await pool.query(text, params);
+    const duration = Date.now() - start;
+    console.log('Executed query', { text, duration, rows: result.rowCount });
+    return result;
+  } catch (error) {
+    console.error('Query error:', error);
+    throw error;
+  }
+};
