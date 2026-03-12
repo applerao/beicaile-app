@@ -12,7 +12,7 @@ export interface User {
 
 export interface CreateUserDTO {
   email: string;
-  password: string;
+  password_hash: string;
   nickname: string;
 }
 

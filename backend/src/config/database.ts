@@ -100,7 +100,7 @@ export const query = async (text: string, params?: any[]) => {
 };
 
 // Helper to get SQLite database instance directly (for transactions, etc.)
-export const getSqliteDb = () => {
+export const getSqliteDb = (): any => {
   if (config.database.type !== 'sqlite') {
     throw new Error('SQLite database is not configured');
   }
