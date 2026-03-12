@@ -16,8 +16,8 @@ cd backend
 if [ ! -f "package.json" ]; then
     npm init -y
 fi
-npm install express cors dotenv pg jsonwebtoken bcryptjs swagger-ui-express
-npm install -D typescript @types/node @types/express @types/cors @types/jsonwebtoken @types/bcryptjs ts-node nodemon
+npm install express cors dotenv pg better-sqlite3 jsonwebtoken bcryptjs swagger-ui-express swagger-jsdoc
+npm install -D typescript @types/node @types/express @types/cors @types/jsonwebtoken @types/bcryptjs @types/pg @types/better-sqlite3 @types/swagger-ui-express ts-node nodemon
 npx tsc --init
 cd ..
 
@@ -46,12 +46,16 @@ if [ ! -f "backend/.env" ]; then
 PORT=8000
 NODE_ENV=development
 
-# 数据库配置
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=beicaile
-DB_USER=postgres
-DB_PASSWORD=postgres
+# 数据库配置（默认使用 SQLite，无需额外配置）
+DB_TYPE=sqlite
+DB_SQLITE_PATH=./data/beicaile.db
+
+# PostgreSQL 配置（可选，当 DB_TYPE=postgres 时使用）
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_NAME=beicaile
+# DB_USER=postgres
+# DB_PASSWORD=postgres
 
 # JWT 配置
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
@@ -76,8 +80,10 @@ cd ..
 echo "✅ 项目初始化完成！"
 echo ""
 echo "下一步："
-echo "1. 配置 backend/.env 文件中的环境变量"
-echo "2. 启动数据库：docker-compose up -d db"
-echo "3. 初始化数据库表：psql -h localhost -U postgres -d beicaile -f database/init.sql"
-echo "4. 启动后端：cd backend && npm run dev"
-echo "5. 启动前端：cd frontend && npm run dev"
+echo "1. 检查 backend/.env 文件中的环境变量配置"
+echo "2. 启动后端：cd backend && npm run dev"
+echo "   - 默认使用 SQLite 数据库，自动创建在 backend/data/beicaile.db"
+echo "   - 如需使用 PostgreSQL，修改 DB_TYPE=postgres 并配置相关参数"
+echo "3. 启动前端：cd frontend && npm run dev"
+echo ""
+echo "📚 详细文档：backend/DATABASE.md"
