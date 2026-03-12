@@ -15,13 +15,29 @@ export interface CreateCheckinDTO {
 
 export class CheckinModel {
   static async create(data: CreateCheckinDTO): Promise<Checkin> {
-    const result = await query(
+    await query(
       `INSERT INTO checkins (user_id, checkin_date, note)
-       VALUES ($1, CURRENT_DATE, $2)
-       RETURNING *`,
+       VALUES ($1, DATE('now'), $2)`,
       [data.user_id, data.note]
     );
-    return result.rows[0];
+    
+    // Get the inserted checkin by ID (SQLite doesn't support RETURNING *)
+    const checkinId = (await query('SELECT last_insert_rowid() as id')).rows[0].id;
+    const checkin = await this.findById(checkinId);
+    
+    if (!checkin) {
+      throw new Error('Failed to retrieve created checkin');
+    }
+    
+    return checkin;
+  }
+
+  static async findById(id: number): Promise<Checkin | null> {
+    const result = await query(
+      'SELECT * FROM checkins WHERE id = $1',
+      [id]
+    );
+    return result.rows[0] || null;
   }
 
   static async findByUserIdAndDate(
@@ -30,7 +46,7 @@ export class CheckinModel {
   ): Promise<Checkin | null> {
     const result = await query(
       `SELECT * FROM checkins 
-       WHERE user_id = $1 AND checkin_date = $2::date`,
+       WHERE user_id = $1 AND date(checkin_date) = date($2)`,
       [userId, date]
     );
     return result.rows[0] || null;
@@ -69,28 +85,61 @@ export class CheckinModel {
       [userId]
     );
     
-    const stats = result.rows[0];
+    const stats = result.rows[0] || { total_count: 0, last_checkin_date: null };
     
-    // 计算连续签到天数
-    const streakResult = await query(
-      `WITH consecutive_checkins AS (
-         SELECT checkin_date,
-                checkin_date - (ROW_NUMBER() OVER (ORDER BY checkin_date))::int as grp
-         FROM checkins
-         WHERE user_id = $1
-         ORDER BY checkin_date DESC
-       )
-       SELECT COUNT(*) as streak
-       FROM consecutive_checkins
-       WHERE grp = (SELECT grp FROM consecutive_checkins LIMIT 1)`,
-      [userId]
-    );
+    // 计算连续签到天数（简化版，兼容 SQLite）
+    const allCheckins = await this.findByUserId(userId, 365);
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let tempStreak = 0;
+    
+    if (allCheckins.length > 0) {
+      const dates = allCheckins.map(c => new Date(c.checkin_date).toISOString().split('T')[0]).sort().reverse();
+      
+      // 计算当前连续签到
+      const today = new Date().toISOString().split('T')[0];
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      
+      if (dates[0] === today || dates[0] === yesterday) {
+        currentStreak = 1;
+        for (let i = 1; i < dates.length; i++) {
+          const prevDate = new Date(dates[i - 1]);
+          const currDate = new Date(dates[i]);
+          const diffDays = Math.round((prevDate.getTime() - currDate.getTime()) / 86400000);
+          
+          if (diffDays === 1) {
+            currentStreak++;
+          } else {
+            break;
+          }
+        }
+      }
+      
+      // 计算最长连续签到
+      for (let i = 0; i < dates.length; i++) {
+        tempStreak = 1;
+        for (let j = i + 1; j < dates.length; j++) {
+          const prevDate = new Date(dates[j - 1]);
+          const currDate = new Date(dates[j]);
+          const diffDays = Math.round((prevDate.getTime() - currDate.getTime()) / 86400000);
+          
+          if (diffDays === 1) {
+            tempStreak++;
+          } else {
+            break;
+          }
+        }
+        if (tempStreak > longestStreak) {
+          longestStreak = tempStreak;
+        }
+      }
+    }
 
     return {
-      total_count: parseInt(stats.total_count, 10),
-      current_streak: parseInt(streakResult.rows[0]?.streak || 0, 10),
-      longest_streak: 0, // 需要更复杂的查询
-      last_checkin_date: stats.last_checkin_date,
+      total_count: parseInt(stats.total_count, 10) || 0,
+      current_streak: currentStreak,
+      longest_streak: longestStreak,
+      last_checkin_date: stats.last_checkin_date ? new Date(stats.last_checkin_date) : null,
     };
   }
 }
