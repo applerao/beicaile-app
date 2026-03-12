@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import { config } from './config/index';
 import { connectDatabase } from './config/database';
+import { initDatabaseTables } from './config/init-database';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import checkinRoutes from './routes/checkin';
@@ -49,6 +50,9 @@ const startServer = async () => {
     // 连接数据库
     await connectDatabase();
     console.log('✅ 数据库连接成功');
+
+    // 初始化数据库表
+    await initDatabaseTables();
 
     // 启动 HTTP 服务
     app.listen(PORT, () => {
