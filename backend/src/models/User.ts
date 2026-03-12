@@ -20,11 +20,19 @@ export class UserModel {
   static async create(data: CreateUserDTO): Promise<User> {
     const result = await query(
       `INSERT INTO users (email, password_hash, nickname)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
+       VALUES ($1, $2, $3)`,
       [data.email, data.password_hash, data.nickname]
     );
-    return result.rows[0];
+    
+    // Get the inserted user by ID (SQLite doesn't support RETURNING *)
+    const userId = result.lastInsertRowid || result.rowCount;
+    const user = await this.findById(userId as number);
+    
+    if (!user) {
+      throw new Error('Failed to retrieve created user');
+    }
+    
+    return user;
   }
 
   static async findByEmail(email: string): Promise<User | null> {
@@ -44,15 +52,16 @@ export class UserModel {
   }
 
   static async update(id: number, data: Partial<User>): Promise<User | null> {
-    const result = await query(
+    await query(
       `UPDATE users 
        SET nickname = COALESCE($2, nickname),
            avatar_url = COALESCE($3, avatar_url),
-           updated_at = NOW()
-       WHERE id = $1
-       RETURNING *`,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
       [id, data.nickname, data.avatar_url]
     );
-    return result.rows[0] || null;
+    
+    // Return the updated user
+    return await this.findById(id);
   }
 }
