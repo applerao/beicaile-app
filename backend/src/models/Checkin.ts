@@ -81,8 +81,8 @@ export class CheckinModel {
           ORDER BY checkin_date DESC 
           LIMIT 1) as last_checkin_date
        FROM checkins 
-       WHERE user_id = $1`,
-      [userId]
+       WHERE user_id = $2`,
+      [userId, userId]
     );
     
     const stats = result.rows[0] || { total_count: 0, last_checkin_date: null };
